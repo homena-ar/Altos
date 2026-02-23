@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Altos de Márquez — Navegación</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- Map container -->
+  <div id="map-container">
+    <div id="svg-wrapper"></div>
+  </div>
+
+  <!-- Top bar -->
+  <header id="top-bar">
+    <div id="top-bar-title">Altos de Márquez</div>
+    <button id="btn-debug" title="Debug: auditar rutas">⚙</button>
+  </header>
+
+  <!-- Origin / Destination panel -->
+  <div id="route-panel">
+    <div class="route-field">
+      <label for="origin-select">Origen</label>
+      <select id="origin-select">
+        <option value="gps">Mi ubicación (GPS)</option>
+        <option value="marquez">Entrada Márquez</option>
+        <option value="florida">Entrada Florida</option>
+        <option value="manual">Manzana / Casa…</option>
+      </select>
+      <div id="origin-manual" class="manual-input hidden">
+        <select id="origin-manzana"><option value="">Manzana…</option></select>
+      </div>
+    </div>
+    <div class="route-field">
+      <label for="dest-select">Destino</label>
+      <select id="dest-select">
+        <option value="manual">Manzana / Casa…</option>
+        <option value="marquez">Salida Márquez</option>
+        <option value="florida">Salida Florida</option>
+      </select>
+      <div id="dest-manual" class="manual-input">
+        <select id="dest-manzana"><option value="">Manzana…</option></select>
+      </div>
+    </div>
+    <button id="btn-route">Navegar</button>
+    <button id="btn-clear" class="secondary hidden">Cancelar</button>
+  </div>
+
+  <!-- Navigation instructions panel -->
+  <div id="nav-panel" class="hidden">
+    <div id="nav-instruction">Calculando ruta…</div>
+    <div id="nav-distance"></div>
+    <button id="btn-stop-nav" class="secondary">Detener navegación</button>
+  </div>
+
+  <!-- Map controls -->
+  <div id="map-controls">
+    <button id="btn-center-gps" title="Centrar en mi ubicación">◎</button>
+    <button id="btn-zoom-in" title="Acercar">+</button>
+    <button id="btn-zoom-out" title="Alejar">−</button>
+  </div>
+
+  <!-- Debug overlay -->
+  <div id="debug-overlay" class="hidden">
+    <div id="debug-header">
+      <span>Auditoría de rutas</span>
+      <button id="btn-close-debug">✕</button>
+    </div>
+    <div id="debug-controls">
+      <button id="btn-run-audit">Auditar 200 rutas</button>
+      <button id="btn-show-graph">Mostrar grafo</button>
+    </div>
+    <pre id="debug-log"></pre>
+  </div>
+
+  <!-- Error toast -->
+  <div id="toast" class="hidden"></div>
+
+  <script src="js/svgLoader.js"></script>
+  <script src="js/graphBuilder.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/gps.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/debug.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
