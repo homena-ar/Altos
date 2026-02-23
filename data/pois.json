@@ -1,0 +1,35 @@
+{
+  "_schema": {
+    "description": "Puntos de interés del barrio Altos de Márquez",
+    "fields": {
+      "id": "Identificador único (string)",
+      "name": "Nombre del comercio/punto",
+      "category": "Categoría: comercio | servicio | salud | educacion | recreacion | otro",
+      "manzana": "Número de manzana más cercana (string)",
+      "casa": "Número de casa/lote (string, opcional)",
+      "xy": "Coordenadas SVG {x, y} si no se usa manzana/casa",
+      "hours": "Horario de atención (string, ej: 'Lun-Vie 9-18')",
+      "phone": "Teléfono de contacto (string, opcional)",
+      "whatsapp": "Número de WhatsApp con código país (string, opcional)",
+      "tags": "Etiquetas para búsqueda (array de strings)",
+      "notes": "Notas adicionales (string, opcional)",
+      "links": "URLs relevantes (array de strings, opcional)"
+    }
+  },
+  "pois": [
+    {
+      "id": "poi_001",
+      "name": "Ejemplo: Almacén del Barrio",
+      "category": "comercio",
+      "manzana": "50",
+      "casa": null,
+      "xy": null,
+      "hours": "Lun-Sáb 8-20",
+      "phone": null,
+      "whatsapp": "+5491100000000",
+      "tags": ["almacen", "comida", "bebidas"],
+      "notes": "Ejemplo de POI. Reemplazar con datos reales.",
+      "links": []
+    }
+  ]
+}
