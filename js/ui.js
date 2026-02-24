@@ -1,28 +1,41 @@
 /**
  * ui.js — UI interactions: origin/dest selectors, manzana dropdowns,
- *         pan/zoom, toast notifications, nav panel
+ *         pan/zoom (viewBox-based), toast notifications, nav panel
+ *
+ * Zoom is implemented by modifying the SVG viewBox directly, which keeps
+ * rendering vectorially crisp at any zoom level (no CSS rasterisation).
  */
 var UI = (function () {
   'use strict';
 
-  // Pan & Zoom state
-  var pan = { x: 0, y: 0 };
-  var zoom = 1;
+  // View state — expressed in SVG coordinate space.
+  // (vx, vy) is the top-left corner of the visible window;
+  // (vw, vh) is the size of the visible window (smaller = more zoom).
+  var vx = 0, vy = 0, vw = 573.2, vh = 704.1;
+  var baseW = 573.2, baseH = 704.1;   // original SVG dimensions
   var MIN_ZOOM = 0.5;
   var MAX_ZOOM = 8;
+
   var isDragging = false;
   var dragStart = { x: 0, y: 0 };
-  var lastPan = { x: 0, y: 0 };
+  var lastView = { x: 0, y: 0 };
   var pinchStartDist = 0;
-  var pinchStartZoom = 1;
+  var pinchStartVW = 0;
+  var pinchStartVH = 0;
 
   var svgWrapper = null;
+  var svgEl = null;
   var mapContainer = null;
 
   /** Initialize UI: bind events, populate dropdowns */
   function init(manzanaIds) {
     svgWrapper = document.getElementById('svg-wrapper');
     mapContainer = document.getElementById('map-container');
+    svgEl = SvgLoader.getSvg();
+
+    var vb = SvgLoader.getViewBox();
+    baseW = vb.w; baseH = vb.h;
+    vx = vb.x; vy = vb.y; vw = vb.w; vh = vb.h;
 
     populateManzanas(manzanaIds);
     bindSelectors();
@@ -83,31 +96,65 @@ var UI = (function () {
     return { type: sel.value };
   }
 
-  // === Pan & Zoom ===
+  // === Pan & Zoom (viewBox-based for crisp vector rendering) ===
 
+  /** Apply the current view to the SVG viewBox */
   function applyTransform() {
-    svgWrapper.style.transform = 'translate(' + pan.x + 'px,' + pan.y + 'px) scale(' + zoom + ')';
+    if (svgEl) {
+      svgEl.setAttribute('viewBox', vx + ' ' + vy + ' ' + vw + ' ' + vh);
+    }
+  }
+
+  /** Current zoom factor (baseW / vw) */
+  function currentZoom() {
+    return baseW / vw;
   }
 
   function fitMapToScreen() {
-    var vb = SvgLoader.getViewBox();
+    // Make SVG wrapper fill the container
+    svgWrapper.style.width = '100%';
+    svgWrapper.style.height = '100%';
+    if (svgEl) {
+      svgEl.style.width = '100%';
+      svgEl.style.height = '100%';
+      svgEl.removeAttribute('width');
+      svgEl.removeAttribute('height');
+    }
+
     var cw = mapContainer.clientWidth;
     var ch = mapContainer.clientHeight;
+    var containerAspect = cw / ch;
+    var svgAspect = baseW / baseH;
 
-    // Fit SVG into container
-    var scaleX = cw / vb.w;
-    var scaleY = ch / vb.h;
-    zoom = Math.min(scaleX, scaleY) * 0.95;
-
+    // Fit with small padding (95%)
+    if (containerAspect > svgAspect) {
+      // Container is wider — fit height
+      vh = baseH / 0.95;
+      vw = vh * containerAspect;
+    } else {
+      // Container is taller — fit width
+      vw = baseW / 0.95;
+      vh = vw / containerAspect;
+    }
     // Center
-    var svgW = vb.w * zoom;
-    var svgH = vb.h * zoom;
-    pan.x = (cw - svgW) / 2;
-    pan.y = (ch - svgH) / 2;
+    vx = (baseW - vw) / 2;
+    vy = (baseH - vh) / 2;
 
-    svgWrapper.style.width = vb.w + 'px';
-    svgWrapper.style.height = vb.h + 'px';
     applyTransform();
+  }
+
+  /**
+   * Convert screen (client) coordinates to SVG coordinates.
+   * This is the key function that lets pan/zoom work correctly.
+   */
+  function clientToSvg(clientX, clientY) {
+    var rect = svgWrapper.getBoundingClientRect();
+    var fracX = (clientX - rect.left) / rect.width;
+    var fracY = (clientY - rect.top) / rect.height;
+    return {
+      x: vx + fracX * vw,
+      y: vy + fracY * vh
+    };
   }
 
   function bindPanZoom() {
@@ -116,14 +163,18 @@ var UI = (function () {
       if (e.button !== 0) return;
       isDragging = true;
       dragStart = { x: e.clientX, y: e.clientY };
-      lastPan = { x: pan.x, y: pan.y };
+      lastView = { x: vx, y: vy };
       mapContainer.style.cursor = 'grabbing';
     });
 
     window.addEventListener('mousemove', function (e) {
       if (!isDragging) return;
-      pan.x = lastPan.x + (e.clientX - dragStart.x);
-      pan.y = lastPan.y + (e.clientY - dragStart.y);
+      var rect = svgWrapper.getBoundingClientRect();
+      var dxPx = e.clientX - dragStart.x;
+      var dyPx = e.clientY - dragStart.y;
+      // Convert screen pixels to SVG units
+      vx = lastView.x - dxPx * (vw / rect.width);
+      vy = lastView.y - dyPx * (vh / rect.height);
       applyTransform();
     });
 
@@ -147,11 +198,12 @@ var UI = (function () {
       if (activeTouches.length === 1) {
         isDragging = true;
         dragStart = { x: activeTouches[0].clientX, y: activeTouches[0].clientY };
-        lastPan = { x: pan.x, y: pan.y };
+        lastView = { x: vx, y: vy };
       } else if (activeTouches.length === 2) {
         isDragging = false;
         pinchStartDist = touchDist(activeTouches[0], activeTouches[1]);
-        pinchStartZoom = zoom;
+        pinchStartVW = vw;
+        pinchStartVH = vh;
       }
     }, { passive: true });
 
@@ -159,20 +211,36 @@ var UI = (function () {
       e.preventDefault();
       var touches = Array.from(e.touches);
       if (touches.length === 1 && isDragging) {
-        pan.x = lastPan.x + (touches[0].clientX - dragStart.x);
-        pan.y = lastPan.y + (touches[0].clientY - dragStart.y);
+        var rect = svgWrapper.getBoundingClientRect();
+        var dxPx = touches[0].clientX - dragStart.x;
+        var dyPx = touches[0].clientY - dragStart.y;
+        vx = lastView.x - dxPx * (vw / rect.width);
+        vy = lastView.y - dyPx * (vh / rect.height);
         applyTransform();
       } else if (touches.length === 2) {
         var d = touchDist(touches[0], touches[1]);
-        var newZoom = pinchStartZoom * (d / pinchStartDist);
-        newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+        var scale = pinchStartDist / d; // inverse: pinch-out → smaller viewBox = zoom in
 
+        var newVW = pinchStartVW * scale;
+        var newVH = pinchStartVH * scale;
+
+        // Clamp zoom
+        var newZoom = baseW / newVW;
+        if (newZoom < MIN_ZOOM) { newVW = baseW / MIN_ZOOM; newVH = baseH / MIN_ZOOM * (newVW / (baseW / MIN_ZOOM)); }
+        if (newZoom > MAX_ZOOM) { newVW = baseW / MAX_ZOOM; newVH = baseH / MAX_ZOOM * (newVW / (baseW / MAX_ZOOM)); }
+
+        // Zoom centered on pinch midpoint
         var cx = (touches[0].clientX + touches[1].clientX) / 2;
         var cy = (touches[0].clientY + touches[1].clientY) / 2;
+        var svgPt = clientToSvg(cx, cy);
 
-        pan.x = cx - (cx - pan.x) * (newZoom / zoom);
-        pan.y = cy - (cy - pan.y) * (newZoom / zoom);
-        zoom = newZoom;
+        var fracX = (svgPt.x - vx) / vw;
+        var fracY = (svgPt.y - vy) / vh;
+
+        vw = newVW;
+        vh = newVH;
+        vx = svgPt.x - fracX * vw;
+        vy = svgPt.y - fracY * vh;
         applyTransform();
       }
     }, { passive: false });
@@ -188,20 +256,29 @@ var UI = (function () {
     return Math.sqrt(dx * dx + dy * dy);
   }
 
+  /** Zoom at a screen point by the given factor (>1 = zoom in) */
   function zoomAt(clientX, clientY, factor) {
-    var newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
-    pan.x = clientX - (clientX - pan.x) * (newZoom / zoom);
-    pan.y = clientY - (clientY - pan.y) * (newZoom / zoom);
-    zoom = newZoom;
+    var z = currentZoom() * factor;
+    z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+
+    var svgPt = clientToSvg(clientX, clientY);
+    var newVW = baseW / z;
+    var newVH = baseH / z;
+
+    // Keep the SVG point under the cursor fixed
+    var fracX = (svgPt.x - vx) / vw;
+    var fracY = (svgPt.y - vy) / vh;
+    vw = newVW;
+    vh = newVH;
+    vx = svgPt.x - fracX * vw;
+    vy = svgPt.y - fracY * vh;
     applyTransform();
   }
 
   /** Center the map on a SVG coordinate */
   function centerOnSvg(svgX, svgY) {
-    var cw = mapContainer.clientWidth;
-    var ch = mapContainer.clientHeight;
-    pan.x = cw / 2 - svgX * zoom;
-    pan.y = ch / 2 - svgY * zoom;
+    vx = svgX - vw / 2;
+    vy = svgY - vh / 2;
     applyTransform();
   }
 
@@ -258,6 +335,7 @@ var UI = (function () {
   function setNavigating(active) {
     document.getElementById('btn-clear').classList.toggle('hidden', !active);
     document.getElementById('route-panel').style.display = active ? 'none' : '';
+    document.body.classList.toggle('navigating', active);
   }
 
   return {

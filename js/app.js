@@ -324,10 +324,19 @@ var App = (function () {
     return angle;
   }
 
-  /** Format SVG distance to approximate meters */
+  /**
+   * Format SVG distance to approximate meters.
+   * Scale is derived from the two GPS calibration anchors in gps.js:
+   *   Anchor A (-34.4813, -58.5267) → SVG (410.4, 589.8)
+   *   Anchor B (-34.4765, -58.5220) → SVG (470.2, 52.6)
+   * Real-world distance between anchors ≈ 680 m (Haversine).
+   * SVG distance ≈ √((470.2-410.4)² + (52.6-589.8)²) ≈ 540.5 SVG units.
+   * Scale ≈ 680 / 540.5 ≈ 1.26 m per SVG unit.
+   */
+  var SVG_TO_METERS = 1.26;
+
   function formatDistance(svgUnits) {
-    // Rough scale: the map is ~480 SVG units wide for ~500m real
-    var meters = Math.round(svgUnits * 1.04);
+    var meters = Math.round(svgUnits * SVG_TO_METERS);
     if (meters >= 1000) return (meters / 1000).toFixed(1) + ' km';
     return meters + ' m';
   }
