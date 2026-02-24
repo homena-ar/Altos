@@ -38,14 +38,14 @@ html, body {
 
 #svg-wrapper {
   position: absolute;
-  transform-origin: 0 0;
-  will-change: transform;
+  inset: 0;
 }
 
 #svg-wrapper svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  shape-rendering: geometricPrecision;
 }
 
 /* ===== Top bar ===== */
@@ -198,6 +198,13 @@ button.secondary:active {
   flex-direction: column;
   gap: 8px;
   z-index: 80;
+  transition: bottom 0.25s ease;
+}
+
+/* Shift controls up when nav panel is visible */
+#nav-panel:not(.hidden) ~ #map-controls,
+body.navigating #map-controls {
+  bottom: 120px;
 }
 
 #map-controls button {
